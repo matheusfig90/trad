@@ -1,3 +1,4 @@
+use crossbeam_channel::{select, tick, unbounded, Receiver};
 use crossterm::{
     event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
@@ -10,7 +11,6 @@ use tui::{
     widgets::{Block, Borders, Widget},
     Terminal,
 };
-use crossbeam_channel::{select, tick, unbounded, Receiver};
 
 fn setup_ui_events() -> Receiver<Event> {
     let (sender, receiver) = unbounded();
@@ -37,23 +37,23 @@ fn main() -> Result<(), io::Error> {
     })?;
 
     loop {
-                select!{ recv(ui_events_receiver) -> message => {
+        select! { recv(ui_events_receiver) -> message => {
 
-                    match message.unwrap() {
-                        Event::Key(key_event) => {
-                            if key_event.modifiers.is_empty() {
-                                match key_event.code {
-                                    KeyCode::Char('q') => {
-                                        break
-                                    },
-                                    _ => {},
-                                }
-                            }
-                        },
-                        _ => {},
+            match message.unwrap() {
+                Event::Key(key_event) => {
+                    if key_event.modifiers.is_empty() {
+                        match key_event.code {
+                            KeyCode::Char('q') => {
+                                break
+                            },
+                            _ => {},
+                        }
                     }
-                }
-                }
+                },
+                _ => {},
+            }
+        }
+        }
     }
 
     // restore terminal
