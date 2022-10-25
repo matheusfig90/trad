@@ -1,14 +1,13 @@
-use crossbeam_channel::{select, tick, unbounded, Receiver};
+use crossbeam_channel::{select, unbounded, Receiver};
 use crossterm::{
-    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use std::{io, thread, time::Duration};
+use std::{io, thread};
 use tui::{
     backend::CrosstermBackend,
-    layout::{Constraint, Direction, Layout},
-    widgets::{Block, Borders, Widget},
+    widgets::{Block, Borders},
     Terminal,
 };
 
@@ -39,19 +38,13 @@ fn main() -> Result<(), io::Error> {
     loop {
         select! { recv(ui_events_receiver) -> message => {
 
-            match message.unwrap() {
-                Event::Key(key_event) => {
+                if let Event::Key(key_event) = message.unwrap() {
                     if key_event.modifiers.is_empty() {
-                        match key_event.code {
-                            KeyCode::Char('q') => {
+                            if let KeyCode::Char('q') = key_event.code {
                                 break
-                            },
-                            _ => {},
-                        }
+                            }
                     }
-                },
-                _ => {},
-            }
+                }
         }
         }
     }
