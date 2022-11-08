@@ -57,7 +57,7 @@ impl App {
 
                     if let Event::Key(key_event) = message.unwrap() {
                         if key_event.modifiers.is_empty() {
-                                if let KeyCode::Char('q') = key_event.code {
+                                if let KeyCode::Esc = key_event.code {
                                     break
                                 }
                         }
