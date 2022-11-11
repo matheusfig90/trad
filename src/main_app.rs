@@ -1,12 +1,11 @@
-use crossbeam_channel::{select, unbounded, Receiver};
 use crossterm::{
-    event::{DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
+    event::{self, DisableMouseCapture, EnableMouseCapture, Event, KeyCode},
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
 use std::{
     io::{self, Stdout},
-    thread,
+    time::{Duration, Instant},
 };
 use tui::{
     backend::CrosstermBackend,
@@ -14,21 +13,12 @@ use tui::{
     Terminal,
 };
 
-fn setup_ui_events() -> Receiver<Event> {
-    let (sender, receiver) = unbounded();
-    thread::spawn(move || loop {
-        sender.send(crossterm::event::read().unwrap()).unwrap();
-    });
-
-    receiver
-}
-
-pub struct App {
+pub struct App<'a> {
     terminal: Terminal<CrosstermBackend<Stdout>>,
-    ui_events_receiver: Receiver<Event>,
+    blocks: Vec<Block<'a>>,
 }
 
-impl App {
+impl<'a> App<'a> {
     pub fn new() -> Self {
         // setup terminal
         enable_raw_mode().unwrap();
@@ -37,32 +27,45 @@ impl App {
         let backend = CrosstermBackend::new(stdout);
         let terminal = Terminal::new(backend).unwrap();
 
-        let ui_events_receiver = setup_ui_events();
-
         App {
             terminal,
-            ui_events_receiver,
+            blocks: App::init_blocks(),
         }
     }
 
-    pub fn run(&mut self) -> Result<(), io::Error> {
+    fn init_blocks() -> Vec<Block<'a>> {
+        let blocks = vec![Block::default().title("Block").borders(Borders::ALL)];
+        blocks
+    }
+
+    fn draw_terminal(&mut self) -> Result<(), io::Error> {
         self.terminal.draw(|f| {
             let size = f.size();
-            let block = Block::default().title("Block").borders(Borders::ALL);
-            f.render_widget(block, size);
-        })?;
-
-        loop {
-            select! { recv(self.ui_events_receiver) -> message => {
-
-                    if let Event::Key(key_event) = message.unwrap() {
-                        if key_event.modifiers.is_empty() {
-                                if let KeyCode::Esc = key_event.code {
-                                    break
-                                }
-                        }
-                    }
+            for block in &self.blocks {
+                f.render_widget(block.clone(), size);
             }
+        })?;
+        Ok(())
+    }
+
+    pub fn run(&mut self) -> Result<(), io::Error> {
+        let mut last_tick = Instant::now();
+        loop {
+            self.draw_terminal()?;
+            let tick_rate = Duration::from_millis(200);
+            let timeout = tick_rate
+                .checked_sub(last_tick.elapsed())
+                .unwrap_or_else(|| Duration::from_secs(0));
+            if crossterm::event::poll(timeout).is_ok() {
+                if let Event::Key(key_event) = event::read().unwrap() {
+                    if let KeyCode::Esc = key_event.code {
+                        break;
+                    }
+                }
+            }
+
+            if last_tick.elapsed() >= tick_rate {
+                last_tick = Instant::now();
             }
         }
 
