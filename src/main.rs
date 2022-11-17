@@ -1,9 +1,10 @@
+mod handlers;
 mod main_app;
 
+use handlers::echo_handler::EchoHandler;
 use main_app::App;
 use std::io;
 use structopt::StructOpt;
-use trad::handlers::echo_handler::EchoHandler;
 
 #[derive(Debug, Clone, StructOpt)]
 enum Command {
