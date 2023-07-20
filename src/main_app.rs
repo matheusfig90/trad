@@ -4,16 +4,18 @@ use crossterm::{
     execute,
     terminal::{disable_raw_mode, enable_raw_mode, EnterAlternateScreen, LeaveAlternateScreen},
 };
-use std::{
-    io::{self, Stdout},
-    thread,
-};
-use tui::{
+use ratatui::widgets::Paragraph;
+use ratatui::{
     backend::CrosstermBackend,
     widgets::{Block, Borders},
     Terminal,
 };
-
+use std::{
+    io::{self, Stdout},
+    thread,
+};
+use tui_input::backend::crossterm::EventHandler;
+use tui_input::Input;
 fn setup_ui_events() -> Receiver<Event> {
     let (sender, receiver) = unbounded();
     thread::spawn(move || loop {
@@ -26,6 +28,7 @@ fn setup_ui_events() -> Receiver<Event> {
 pub struct App {
     terminal: Terminal<CrosstermBackend<Stdout>>,
     ui_events_receiver: Receiver<Event>,
+    input: Input,
 }
 
 impl App {
@@ -42,24 +45,28 @@ impl App {
         App {
             terminal,
             ui_events_receiver,
+            input: Input::default(),
         }
     }
 
     pub fn run(&mut self) -> Result<(), io::Error> {
-        self.terminal.draw(|f| {
-            let size = f.size();
-            let block = Block::default().title("Block").borders(Borders::ALL);
-            f.render_widget(block, size);
-        })?;
-
         loop {
+            self.terminal.draw(|f| {
+                let size = f.size();
+                let input = Paragraph::new(self.input.value())
+                    .block(Block::default().borders(Borders::ALL).title("Input"));
+                f.render_widget(input, size);
+                f.set_cursor(self.input.visual_cursor() as u16 + 1, 1);
+            })?;
+
             select! { recv(self.ui_events_receiver) -> message => {
 
                     if let Event::Key(key_event) = message.unwrap() {
                         if key_event.modifiers.is_empty() {
-                                if let KeyCode::Char('q') = key_event.code {
-                                    break
-                                }
+                            match key_event.code {
+                                KeyCode::Esc => break,
+                                _ => { self.input.handle_event(&Event::Key(key_event));},
+                            }
                         }
                     }
             }
